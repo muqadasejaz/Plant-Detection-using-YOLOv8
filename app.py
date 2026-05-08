@@ -2,18 +2,16 @@ import streamlit as st
 import gdown
 import os
 import tempfile
-import cv2
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
 # ─────────────────────────────────────────────
-# CONFIG 
+# CONFIG
 # ─────────────────────────────────────────────
 GDRIVE_FILE_ID = st.secrets["GDRIVE_FILE_ID"]
 MODEL_PATH = "best.pt"
 
-# Disease info dictionary for extra context
 DISEASE_INFO = {
     "Apple Scab": "Fungal disease causing dark, scabby lesions on leaves and fruit.",
     "Apple Rust": "Rust fungus that creates orange/yellow spots on apple leaves.",
@@ -27,9 +25,8 @@ DISEASE_INFO = {
     "Healthy Leaf": "No disease detected. The plant appears healthy!",
 }
 
-
 # ─────────────────────────────────────────────
-# LOAD MODEL (cached so it only downloads once)
+# LOAD MODEL
 # ─────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def load_model():
@@ -41,18 +38,17 @@ def load_model():
 
 
 # ─────────────────────────────────────────────
-# RUN DETECTION ON A PIL IMAGE
+# IMAGE DETECTION — no cv2
 # ─────────────────────────────────────────────
 def run_detection(model, image: Image.Image, conf_threshold: float):
     img_array = np.array(image)
     results = model.predict(img_array, conf=conf_threshold, verbose=False)
     result = results[0]
 
-    # Draw bounding boxes on the image
-    annotated = result.plot()
-    annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+    # plot() returns BGR numpy array — flip to RGB with numpy
+    annotated_bgr = result.plot()
+    annotated_rgb = annotated_bgr[:, :, ::-1]  # BGR → RGB, no cv2 needed
 
-    # Collect detections
     detections = []
     for box in result.boxes:
         class_id = int(box.cls[0])
@@ -64,50 +60,57 @@ def run_detection(model, image: Image.Image, conf_threshold: float):
 
 
 # ─────────────────────────────────────────────
-# RUN DETECTION ON A VIDEO FILE
+# VIDEO DETECTION — no cv2
 # ─────────────────────────────────────────────
 def run_video_detection(model, video_path: str, conf_threshold: float):
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    import imageio
 
-    out_path = video_path.replace(".mp4", "_detected.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    reader = imageio.get_reader(video_path)
+    fps = reader.get_meta_data().get("fps", 25)
 
     all_detections = []
-    frame_count = 0
-    progress = st.progress(0, text="Processing video frames...")
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frames = []
+    MAX_FRAMES = 50
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
+    progress = st.progress(0, text="Processing video frames...")
+
+    for frame_count, frame in enumerate(reader):
+        if frame_count >= MAX_FRAMES:
             break
 
-        results = model.predict(frame, conf=conf_threshold, verbose=False)
-        annotated = results[0].plot()
-        out.write(annotated)
+        # frame is already RGB numpy array — no cv2 needed
+        results = model.track(frame, persist=True, conf=conf_threshold, verbose=False)
+        annotated_bgr = results[0].plot()
+        annotated_rgb = annotated_bgr[:, :, ::-1]  # BGR → RGB
+        frames.append(Image.fromarray(annotated_rgb))
 
         for box in results[0].boxes:
-            class_id = int(box.cls[0])
-            class_name = model.names[class_id]
-            confidence = float(box.conf[0])
-            all_detections.append({"class": class_name, "confidence": confidence})
+            if box.cls is not None:
+                class_id = int(box.cls[0])
+                class_name = model.names[class_id]
+                confidence = float(box.conf[0])
+                all_detections.append({"class": class_name, "confidence": confidence})
 
-        frame_count += 1
-        if total_frames > 0:
-            progress.progress(
-                min(frame_count / total_frames, 1.0),
-                text=f"Processing frame {frame_count}/{total_frames}...",
-            )
+        progress.progress(
+            (frame_count + 1) / MAX_FRAMES,
+            text=f"Processing frame {frame_count + 1}/{MAX_FRAMES}..."
+        )
 
-    cap.release()
-    out.release()
+    reader.close()
     progress.empty()
-    return out_path, all_detections
 
+    # Save as GIF
+    out_path = video_path.replace(".mp4", "_detected.gif")
+    if frames:
+        frames[0].save(
+            out_path,
+            save_all=True,
+            append_images=frames[1:],
+            loop=0,
+            duration=int(1000 / fps),
+        )
+
+    return out_path, all_detections
 
 # ─────────────────────────────────────────────
 # UI
@@ -120,11 +123,9 @@ st.set_page_config(
 
 st.title("🌿 Plant Disease Detection")
 st.markdown(
-    "Upload a leaf image or video to detect diseases using a YOLOv8 model "
-    "trained on 10+ plant disease classes."
+    "Upload a leaf image or video to detect diseases using a YOLOv8 model"
 )
 
-# Sidebar
 with st.sidebar:
     st.header("Settings")
     conf_threshold = st.slider(
@@ -140,15 +141,13 @@ with st.sidebar:
     for disease in DISEASE_INFO:
         st.markdown(f"- {disease}")
 
-# Load model
 try:
     model = load_model()
-    st.success("Model loaded successfully.", icon="✅")
+    st.success("Model loaded successfully")
 except Exception as e:
     st.error(f"Failed to load model: {e}")
     st.stop()
 
-# Input mode tabs
 tab_image, tab_video = st.tabs(["📷 Image Detection", "🎥 Video Detection"])
 
 # ── IMAGE TAB ──
@@ -179,16 +178,12 @@ with tab_image:
                 disease = det["class"]
                 info = DISEASE_INFO.get(disease, "")
                 color = "green" if disease == "Healthy Leaf" else "red"
-
-                with st.expander(
-                    f":{color}[{disease}] — {conf_pct:.1f}% confidence"
-                ):
+                with st.expander(f":{color}[{disease}] — {conf_pct:.1f}% confidence"):
                     st.write(info)
         else:
-            st.info(
-                "No detections found. Try lowering the confidence threshold in the sidebar."
-            )
+            st.info("No detections found. Try lowering the confidence threshold.")
 
+# ── VIDEO TAB ──
 # ── VIDEO TAB ──
 with tab_video:
     uploaded_video = st.file_uploader(
@@ -203,17 +198,20 @@ with tab_video:
         st.video(tmp_path)
 
         if st.button("Run Detection on Video", type="primary"):
+
             with st.spinner("Analyzing video..."):
-                out_path, detections = run_video_detection(
-                    model, tmp_path, conf_threshold
-                )
+                try:
+                    out_path, detections = run_video_detection(model, tmp_path, conf_threshold)
+                except Exception as e:
+                    st.error(f"Video processing failed: {e}")
+                    os.unlink(tmp_path)
+                    st.stop()
 
             st.success("Video processing complete!")
-            st.subheader("Annotated Video")
-            st.video(out_path)
+            st.subheader("Annotated Output")
+            st.image(out_path, caption="Detected frames (GIF)")
 
             if detections:
-                # Summarize detections
                 from collections import Counter
                 counts = Counter(d["class"] for d in detections)
                 avg_conf = {}
@@ -230,5 +228,4 @@ with tab_video:
             else:
                 st.info("No diseases detected in the video.")
 
-            # Cleanup temp files
             os.unlink(tmp_path)
