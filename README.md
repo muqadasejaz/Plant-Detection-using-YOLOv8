@@ -2,6 +2,9 @@
 
 A computer vision-based project that uses **YOLOv8** to detect and classify plant leaves in real time, helping identify healthy and diseased plants efficiently to support smart agriculture solutions.
 
+<img width="1408" height="768" alt="Plant Diseases Detection App" src="https://github.com/user-attachments/assets/0f768603-ed60-4b66-80a2-bd10a1e1f6af" />
+
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## 🧾 Overview
@@ -11,6 +14,14 @@ The system is designed to accurately detect and classify plant diseases from ima
 The goal of this project is to help farmers and researchers identify plant diseases early, ensuring better crop health and productivity.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+## 🌐 Live Demo
+
+Click here to try the live app 👉 [Plant Diseases Detection App](https://plant-dectection.streamlit.app/)
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 ## ✨ Features
 - 🌱 Real-time plant and leaf detection using YOLOv8  
