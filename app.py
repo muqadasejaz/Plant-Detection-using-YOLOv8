@@ -79,10 +79,17 @@ def run_video_detection(model, video_path: str, conf_threshold: float):
             break
 
         # frame is already RGB numpy array — no cv2 needed
-        results = model.track(frame, persist=True, conf=conf_threshold, verbose=False)
+        try:
+            results = model.track(frame, persist=True, conf=conf_threshold, verbose=False)
+        except Exception:
+            results = model.predict(frame, conf=conf_threshold, verbose=False)
+
         annotated_bgr = results[0].plot()
         annotated_rgb = annotated_bgr[:, :, ::-1]  # BGR → RGB
-        frames.append(Image.fromarray(annotated_rgb))
+
+        # Resize to reduce GIF size
+        frame_img = Image.fromarray(annotated_rgb).resize((640, 360))
+        frames.append(frame_img)
 
         for box in results[0].boxes:
             if box.cls is not None:
@@ -111,6 +118,7 @@ def run_video_detection(model, video_path: str, conf_threshold: float):
         )
 
     return out_path, all_detections
+
 
 # ─────────────────────────────────────────────
 # UI
@@ -162,14 +170,14 @@ with tab_image:
 
         with col1:
             st.subheader("Original Image")
-            st.image(image, use_container_width=True)
+            st.image(image, width="stretch")
 
         with st.spinner("Running detection..."):
             annotated_image, detections = run_detection(model, image, conf_threshold)
 
         with col2:
             st.subheader("Detection Results")
-            st.image(annotated_image, use_container_width=True)
+            st.image(annotated_image, width="stretch")
 
         if detections:
             st.subheader(f"Found {len(detections)} detection(s)")
@@ -183,7 +191,6 @@ with tab_image:
         else:
             st.info("No detections found. Try lowering the confidence threshold.")
 
-# ── VIDEO TAB ──
 # ── VIDEO TAB ──
 with tab_video:
     uploaded_video = st.file_uploader(
