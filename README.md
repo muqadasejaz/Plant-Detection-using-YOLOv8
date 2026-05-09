@@ -52,9 +52,15 @@ Click here to try the live app 👉 [Plant Diseases Detection App](https://plant
 
 ├── YOLOv8_plant_detection.ipynb
 
+├── app.py
+
 ├── apple.mp4  
 
+├── packages.txt
+
 ├── requirements.txt 
+
+├── runtime.txt
 
 └── track.py
 
@@ -69,7 +75,7 @@ git clone https://github.com/muqadasejaz/-Plant-Detection-using-YOLOv8
 
 ### 2. Install Dependencies
 ```bash
-pip install ultralytics opencv-python matplotlib
+pip install -r requirements.txt
 ```
 
 ### 3. Dataset Setup
