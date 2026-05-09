@@ -242,14 +242,21 @@ BS Computer Science (AI Specialization)
 
 AI/ML Engineer
 
-Data Science & Gen AI Enthusiast
+Kaggle Grand Master
+
+Data Science & Gen AI 
 
 📫 Connect with me on [LinkedIn](https://www.linkedin.com/in/muqadasejaz/)  
 
 🌐 GitHub: [github.com/muqadasejaz](https://github.com/muqadasejaz)
+
+📬 Kaggle: [Kaggle Profile](https://www.kaggle.com/muqaddasejaz) 
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## 📎 License
 
 This project is open-source and available under the [MIT License](LICENSE).
+
+⭐ If you find this project useful, don’t forget to star the repository!
+
